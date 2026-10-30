@@ -1,0 +1,27 @@
+{
+  "name": "madacash-flow",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.33.2",
+  "engines": {
+    "node": ">=20.11.1 <25",
+    "pnpm": ">=10.0.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "pnpm --recursive --parallel --if-present dev",
+    "build": "pnpm --recursive --if-present build",
+    "lint": "pnpm --recursive --if-present lint",
+    "typecheck": "pnpm --recursive --if-present typecheck",
+    "test": "pnpm --recursive --if-present test",
+    "format": "pnpm --recursive --if-present format"
+  },
+  "devDependencies": {
+    "eslint": "^9.36.0",
+    "prettier": "^3.5.0",
+    "typescript": "^5.9.2"
+  }
+}
