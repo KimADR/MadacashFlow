@@ -23,5 +23,14 @@
     "eslint": "^9.36.0",
     "prettier": "^3.5.0",
     "typescript": "^5.9.2"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "argon2",
+      "esbuild",
+      "prisma"
+    ]
   }
 }

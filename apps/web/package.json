@@ -6,7 +6,7 @@
     "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start -p 3000",
-    "lint": "eslint . --ext .ts,.tsx --max-warnings=0",
+    "lint": "eslint app lib --ext .ts,.tsx --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "test": "node ./scripts/smoke.mjs",
     "format": "prettier --write ."

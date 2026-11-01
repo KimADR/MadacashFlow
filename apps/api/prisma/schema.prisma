@@ -1,0 +1,267 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MembershipRole {
+  ADMIN
+  FINANCE
+  SALES
+  VIEWER
+}
+
+enum InvoiceStatus {
+  ACTIVE
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  CONFIRMED
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  MOBILE_MONEY
+  CHEQUE
+  OTHER
+}
+
+enum CollectionEventType {
+  REMINDER_RECORDED
+  PROMISE_RECORDED
+  DISPUTE_OPENED
+  DISPUTE_RESOLVED
+}
+
+enum CollectionChannel {
+  EMAIL
+  PHONE
+  IN_PERSON
+  OTHER
+}
+
+model Tenant {
+  id               String              @id @default(uuid()) @db.Uuid
+  name             String              @db.VarChar(160)
+  slug             String              @unique @db.VarChar(80)
+  isActive         Boolean             @default(true)
+  createdAt        DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime            @updatedAt @db.Timestamptz(3)
+  memberships      Membership[]
+  sessions         Session[]           @relation("ActiveTenant")
+  auditLogs        AuditLog[]
+  clients          Client[]
+  imports          InvoiceImport[]
+  payments         Payment[]
+  paymentImports   PaymentImport[]
+  allocations      PaymentAllocation[]
+  collectionCases  CollectionCase[]
+  collectionEvents CollectionEvent[]
+}
+
+model User {
+  id               String            @id @default(uuid()) @db.Uuid
+  email            String            @unique @db.VarChar(320)
+  passwordHash     String            @db.VarChar(255)
+  isActive         Boolean           @default(true)
+  createdAt        DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime          @updatedAt @db.Timestamptz(3)
+  memberships      Membership[]
+  sessions         Session[]
+  auditLogs        AuditLog[]
+  collectionEvents CollectionEvent[]
+}
+
+model Membership {
+  id        String         @id @default(uuid()) @db.Uuid
+  userId    String         @db.Uuid
+  tenantId  String         @db.Uuid
+  role      MembershipRole
+  createdAt DateTime       @default(now()) @db.Timestamptz(3)
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant    Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId])
+  @@index([userId])
+  @@index([tenantId])
+}
+
+model Session {
+  id             String    @id @default(uuid()) @db.Uuid
+  tokenHash      String    @unique @db.Char(64)
+  userId         String    @db.Uuid
+  activeTenantId String?   @db.Uuid
+  expiresAt      DateTime  @db.Timestamptz(3)
+  revokedAt      DateTime? @db.Timestamptz(3)
+  createdAt      DateTime  @default(now()) @db.Timestamptz(3)
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activeTenant   Tenant?   @relation("ActiveTenant", fields: [activeTenantId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @db.Uuid
+  userId    String?  @db.Uuid
+  action    String   @db.VarChar(100)
+  details   Json?    @db.JsonB
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([userId, createdAt])
+}
+
+model Client {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @db.Uuid
+  reference String    @db.VarChar(80)
+  name      String    @db.VarChar(200)
+  email     String?   @db.VarChar(320)
+  phone     String?   @db.VarChar(40)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(3)
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invoices  Invoice[]
+  payments  Payment[]
+
+  @@unique([tenantId, reference])
+  @@unique([tenantId, id])
+  @@index([tenantId, name])
+}
+
+model Invoice {
+  id             String              @id @default(uuid()) @db.Uuid
+  tenantId       String              @db.Uuid
+  clientId       String              @db.Uuid
+  number         String              @db.VarChar(80)
+  issueDate      DateTime            @db.Date
+  dueDate        DateTime            @db.Date
+  amountAr       BigInt              @db.BigInt
+  status         InvoiceStatus       @default(ACTIVE)
+  cancelledAt    DateTime?           @db.Timestamptz(3)
+  createdAt      DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime            @updatedAt @db.Timestamptz(3)
+  client         Client              @relation(fields: [tenantId, clientId], references: [tenantId, id], onDelete: Restrict)
+  allocations    PaymentAllocation[]
+  collectionCase CollectionCase?
+
+  @@unique([tenantId, clientId, number])
+  @@unique([tenantId, id])
+  @@index([tenantId, status, dueDate])
+  @@index([tenantId, clientId])
+}
+
+model Payment {
+  id          String              @id @default(uuid()) @db.Uuid
+  tenantId    String              @db.Uuid
+  clientId    String              @db.Uuid
+  amountAr    BigInt              @db.BigInt
+  receivedAt  DateTime            @db.Date
+  method      PaymentMethod
+  reference   String?             @db.VarChar(120)
+  status      PaymentStatus       @default(PENDING)
+  confirmedAt DateTime?           @db.Timestamptz(3)
+  importId    String?             @db.Uuid
+  createdAt   DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime            @updatedAt @db.Timestamptz(3)
+  tenant      Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  client      Client              @relation(fields: [tenantId, clientId], references: [tenantId, id], onDelete: Restrict)
+  import      PaymentImport?      @relation(fields: [tenantId, importId], references: [tenantId, id], onDelete: Restrict)
+  allocations PaymentAllocation[]
+
+  @@unique([tenantId, id])
+  @@index([tenantId, importId])
+  @@index([tenantId, status, receivedAt])
+  @@index([tenantId, clientId])
+}
+
+model PaymentImport {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @db.Uuid
+  contentHash   String    @db.Char(64)
+  createdCount  Int
+  rejectedCount Int
+  rejectedRows  Json
+  createdAt     DateTime  @default(now()) @db.Timestamptz(3)
+  tenant        Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  payments      Payment[]
+
+  @@unique([tenantId, contentHash])
+  @@unique([tenantId, id])
+  @@index([tenantId, createdAt])
+}
+
+model PaymentAllocation {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @db.Uuid
+  paymentId String   @db.Uuid
+  invoiceId String   @db.Uuid
+  amountAr  BigInt   @db.BigInt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  payment   Payment  @relation(fields: [tenantId, paymentId], references: [tenantId, id], onDelete: Restrict)
+  invoice   Invoice  @relation(fields: [tenantId, invoiceId], references: [tenantId, id], onDelete: Restrict)
+
+  @@unique([paymentId, invoiceId])
+  @@index([tenantId, invoiceId])
+  @@index([tenantId, paymentId])
+}
+
+model CollectionCase {
+  id            String            @id @default(uuid()) @db.Uuid
+  tenantId      String            @db.Uuid
+  invoiceId     String            @db.Uuid
+  disputedAt    DateTime?         @db.Timestamptz(3)
+  disputeReason String?           @db.VarChar(1000)
+  createdAt     DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime          @updatedAt @db.Timestamptz(3)
+  tenant        Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invoice       Invoice           @relation(fields: [tenantId, invoiceId], references: [tenantId, id], onDelete: Restrict)
+  events        CollectionEvent[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, invoiceId])
+  @@index([tenantId, disputedAt])
+}
+
+model CollectionEvent {
+  id               String              @id @default(uuid()) @db.Uuid
+  tenantId         String              @db.Uuid
+  collectionCaseId String              @db.Uuid
+  userId           String              @db.Uuid
+  type             CollectionEventType
+  channel          CollectionChannel?
+  note             String?             @db.VarChar(1000)
+  promisedDate     DateTime?           @db.Date
+  amountAr         BigInt?             @db.BigInt
+  createdAt        DateTime            @default(now()) @db.Timestamptz(3)
+  tenant           Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  collectionCase   CollectionCase      @relation(fields: [tenantId, collectionCaseId], references: [tenantId, id], onDelete: Restrict)
+  user             User                @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, collectionCaseId, createdAt])
+}
+
+model InvoiceImport {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @db.Uuid
+  contentHash   String   @db.Char(64)
+  createdCount  Int
+  rejectedCount Int
+  rejectedRows  Json
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, contentHash])
+  @@index([tenantId, createdAt])
+}

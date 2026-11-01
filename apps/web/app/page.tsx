@@ -16,8 +16,14 @@ export default function HomePage() {
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-4">
             <Link
-              href="/health"
+              href="/login"
               className="inline-flex items-center rounded-md bg-primary px-5 py-3 text-sm font-medium text-white transition hover:bg-blue-700"
+            >
+              Se connecter
+            </Link>
+            <Link
+              href="/health"
+              className="inline-flex items-center rounded-md border border-slate-300 px-5 py-3 text-sm font-medium text-navy transition hover:bg-slate-50"
             >
               Voir l’état /health
             </Link>
