@@ -7,7 +7,11 @@ import {
 } from '@nestjs/common';
 import { InvoiceStatus, PaymentStatus, Prisma } from '@prisma/client';
 import type { AuthenticatedUserContext } from '../common/auth-context';
-import { calendarDateString, parseCalendarDate } from '../common/calendar-date';
+import {
+  calendarDateString,
+  madagascarToday,
+  parseCalendarDate,
+} from '../common/calendar-date';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateAllocationDto } from './dto/create-allocation.dto';
 import type { CreatePaymentDto } from './dto/create-payment.dto';
@@ -154,6 +158,12 @@ export class PaymentService {
           status: payment.status,
           confirmedAt: payment.confirmedAt,
         };
+      }
+      if (calendarDateString(payment.receivedAt) > madagascarToday()) {
+        throw new BadRequestException({
+          code: 'PAYMENT_DATE_IN_FUTURE',
+          message: 'Un paiement daté dans le futur ne peut pas être confirmé.',
+        });
       }
 
       const confirmedAt = new Date();

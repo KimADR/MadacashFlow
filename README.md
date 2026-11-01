@@ -63,6 +63,7 @@ Voir `docs/adr/ADR-001-monorepo-proxy.md` pour la décision technique initiale s
 Voir `docs/adr/ADR-002-auth-sessions-tenants.md` pour les sessions, l'anti-CSRF et l'isolation tenant.
 Voir `docs/adr/ADR-003-payments-allocations.md` pour la confirmation et l'affectation transactionnelles des paiements.
 Voir `docs/adr/ADR-004-manual-collections.md` pour le suivi manuel des relances, promesses et litiges.
+Voir `docs/adr/ADR-005-tresorerie-previsionnelle.md` pour les règles et hypothèses de prévision sur 13 semaines.
 
 ## Variables d'environnement
 
@@ -90,6 +91,13 @@ session, utiliser le bouton de déconnexion.
   ouvert suspend les actions de relance et de promesse. Aucun message n'est
   envoyé automatiquement. ADMIN/FINANCE gèrent les dossiers, VIEWER les
   consulte ; SALES reste bloqué jusqu'à la prise en charge des dossiers attribués.
+- `/forecast` affiche une projection de trésorerie sur 13 semaines et la
+  balance âgée CSV. ADMIN/FINANCE saisissent le solde d'ouverture du jour et
+  gèrent les dépenses prévues ; ADMIN/FINANCE/VIEWER consultent la projection.
+  Les paiements confirmés, créances, promesses et dépenses sont affichés
+  séparément. La projection est désactivée tant que le solde du jour n'est pas
+  renseigné ; les hypothèses des scénarios attendu et prudent sont décrites dans
+  `docs/adr/ADR-005-tresorerie-previsionnelle.md`.
 - `POST /api/v1/imports/payments/preview` valide un CSV sans écriture ;
   `/commit` crée les paiements valides en statut `PENDING` dans une transaction.
   Les répétitions du même fichier sont idempotentes par entreprise ; le mode

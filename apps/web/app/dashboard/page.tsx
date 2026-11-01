@@ -16,14 +16,35 @@ export default async function DashboardPage() {
   if (!currentUser.tenant || !currentUser.role) {
     redirect('/login');
   }
-  const summary = await getApiData<{
-    totalOpenAr: string;
-    invoiceCount: number;
-    dueNext7DaysAr: string;
-    dueNext7DaysCount: number;
-    buckets: Record<string, { amountAr: string; count: number }>;
-  }>('/invoices/summary');
+  const canReadForecast =
+    currentUser.role === 'ADMIN' ||
+    currentUser.role === 'FINANCE' ||
+    currentUser.role === 'VIEWER';
+  const [summary, openingBalance] = await Promise.all([
+    getApiData<{
+      totalOpenAr: string;
+      invoiceCount: number;
+      dueNext7DaysAr: string;
+      dueNext7DaysCount: number;
+      buckets: Record<string, { amountAr: string; count: number }>;
+    }>('/invoices/summary'),
+    canReadForecast
+      ? getApiData<{ asOfDate: string; amountAr: string } | null>(
+          '/forecast/opening-balance',
+        )
+      : Promise.resolve(null),
+  ]);
   if (!summary) redirect('/login');
+  const forecast = openingBalance
+    ? await getApiData<{
+        forecast: {
+          weeks: Array<{
+            prudentClosingBalanceAr: string;
+          }>;
+        } | null;
+      }>('/forecast')
+    : null;
+  if (openingBalance && !forecast) redirect('/login');
 
   return (
     <main className="min-h-screen bg-canvas p-6 text-navy">
@@ -46,7 +67,7 @@ export default async function DashboardPage() {
           </p>
         </div>
         <section
-          className="mt-6 grid gap-4 sm:grid-cols-2"
+          className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
           aria-label="Situation des créances"
         >
           <article className="rounded-xl border border-slate-200 p-5">
@@ -58,6 +79,27 @@ export default async function DashboardPage() {
             </p>
             <p className="mt-1 text-sm text-slate-500">
               {summary.invoiceCount} facture(s) active(s)
+            </p>
+          </article>
+          <article className="rounded-xl border border-slate-200 p-5">
+            <h2 className="text-sm font-medium text-slate-600">
+              Solde prudent projeté à 13 semaines
+            </h2>
+            <p className="mt-2 text-2xl font-bold">
+              {!canReadForecast
+                ? 'Accès restreint'
+                : forecast?.forecast?.weeks.length
+                  ? formatAr(
+                      forecast.forecast.weeks[
+                        forecast.forecast.weeks.length - 1
+                      ].prudentClosingBalanceAr,
+                    )
+                  : 'À configurer'}
+            </p>
+            <p className="mt-1 text-sm text-slate-500">
+              {canReadForecast
+                ? 'Les promesses ne sont pas des encaissements confirmés.'
+                : 'Prévision accessible aux rôles FINANCE, ADMIN et VIEWER.'}
             </p>
           </article>
           <article className="rounded-xl border border-slate-200 p-5">
@@ -97,6 +139,14 @@ export default async function DashboardPage() {
           >
             Recouvrement
           </a>
+          {canReadForecast && (
+            <a
+              href="/forecast"
+              className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-50"
+            >
+              Prévision et rapports
+            </a>
+          )}
         </nav>
         <p className="mt-5 text-xs text-slate-500">
           Seuls les paiements confirmés et affectés diminuent le solde des

@@ -11,6 +11,7 @@ import { CsrfGuard } from './common/csrf.guard';
 import { RolesGuard } from './common/roles.guard';
 import { InvoiceImportModule } from './imports/invoice-import.module';
 import { InvoiceModule } from './invoices/invoice.module';
+import { ForecastModule } from './forecast/forecast.module';
 import { PaymentModule } from './payments/payment.module';
 import { PaymentImportModule } from './payments/payment-import.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -24,6 +25,7 @@ import { TenantModule } from './tenants/tenant.module';
     ClientModule,
     CollectionModule,
     InvoiceModule,
+    ForecastModule,
     InvoiceImportModule,
     PaymentModule,
     PaymentImportModule,

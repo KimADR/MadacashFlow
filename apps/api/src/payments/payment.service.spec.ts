@@ -2,6 +2,7 @@ import { ConflictException } from '@nestjs/common';
 import { InvoiceStatus, PaymentStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AuthenticatedUserContext } from '../common/auth-context';
+import { madagascarToday, parseCalendarDate } from '../common/calendar-date';
 import { PaymentService } from './payment.service';
 
 const tenantId = 'c0a80101-0000-4000-8000-000000000002';
@@ -20,7 +21,7 @@ const auth: AuthenticatedUserContext = {
 function createHarness() {
   const transaction = {
     $queryRaw: jest.fn().mockResolvedValue([{ id: paymentId }]),
-    payment: { findFirst: jest.fn() },
+    payment: { findFirst: jest.fn(), update: jest.fn() },
     invoice: { findFirst: jest.fn() },
     paymentAllocation: {
       findUnique: jest.fn().mockResolvedValue(null),
@@ -42,7 +43,45 @@ function createHarness() {
   };
 }
 
-describe('PaymentService allocation invariants', () => {
+describe('PaymentService', () => {
+  it('refuses to confirm a payment whose receipt date is in the future', async () => {
+    const { service, transaction } = createHarness();
+    const futureDate = parseCalendarDate(madagascarToday())!;
+    futureDate.setUTCDate(futureDate.getUTCDate() + 1);
+    transaction.payment.findFirst.mockResolvedValue({
+      id: paymentId,
+      receivedAt: futureDate,
+      status: PaymentStatus.PENDING,
+    });
+
+    await expect(service.confirm(auth, paymentId)).rejects.toMatchObject({
+      status: 400,
+      response: { code: 'PAYMENT_DATE_IN_FUTURE' },
+    });
+    expect(transaction.payment.update).not.toHaveBeenCalled();
+    expect(transaction.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it('keeps confirmation idempotent for an already confirmed payment', async () => {
+    const { service, transaction } = createHarness();
+    const futureDate = parseCalendarDate(madagascarToday())!;
+    futureDate.setUTCDate(futureDate.getUTCDate() + 1);
+    const confirmedAt = new Date();
+    transaction.payment.findFirst.mockResolvedValue({
+      id: paymentId,
+      receivedAt: futureDate,
+      status: PaymentStatus.CONFIRMED,
+      confirmedAt,
+    });
+
+    await expect(service.confirm(auth, paymentId)).resolves.toEqual({
+      id: paymentId,
+      status: PaymentStatus.CONFIRMED,
+      confirmedAt,
+    });
+    expect(transaction.payment.update).not.toHaveBeenCalled();
+  });
+
   it('refuses allocations while a payment is pending', async () => {
     const { service, transaction } = createHarness();
     transaction.payment.findFirst.mockResolvedValue({
