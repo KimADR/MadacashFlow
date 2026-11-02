@@ -53,6 +53,35 @@ pnpm test
 pnpm build
 ```
 
+Les tests PostgreSQL isolés, disponibles pour le CI et le développement local,
+exigent une variable `TEST_DATABASE_URL` pointant sur `localhost` et sur une
+base dédiée nommée `madacash_test` :
+
+```powershell
+$env:TEST_DATABASE_URL = "postgresql://mada_test:mada_test_only@127.0.0.1:5432/madacash_test?schema=public"
+pnpm --filter @mada-cash/api run test:postgres
+Remove-Item Env:TEST_DATABASE_URL
+```
+
+Le script refuse les autres hôtes ou noms de base et n'utilise pas `.env`.
+Dans PowerShell, l'affectation de variable affichée ci-dessus configure
+`TEST_DATABASE_URL` pour la session courante.
+
+La restauration PostgreSQL est également testée avec un couple de bases
+jetables vide, créé explicitement dans la CI. Le script `test:restore` exige
+les noms `madacash_restore_source` et `madacash_restore_target` sur localhost,
+refuse toute destination non vide et ne lit/écrit qu'une table synthétique.
+
+## Disponibilité et durcissement
+
+- `GET /api/v1/health` vérifie que le processus API répond.
+- `GET /api/v1/ready` vérifie aussi la connexion à PostgreSQL et renvoie une
+  erreur `503` sans divulguer les détails de connexion si la base est
+  indisponible.
+- La revue de sécurité et le guide d'exploitation, avec leurs limites
+  explicites avant pilote, sont dans `docs/SÉCURITÉ.md` et
+  `docs/EXPLOITATION.md`.
+
 ## Proxy côté navigateur
 
 Le front web s'appuie sur un proxy de même origine pour les requêtes `/api/v1` vers le service NestJS local. Cela évite de divulguer des cookies cross-site et simplifie la sécurité des sessions. En production, la configuration de routage devra rester explicite et gardée dans le reverse proxy ou le plan de déploiement ; la logique métier ne doit jamais dépendre d'un client pour choisir le tenant.

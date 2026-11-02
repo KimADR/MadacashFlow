@@ -8,6 +8,20 @@ on:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: madacash_test
+          POSTGRES_USER: mada_test
+          POSTGRES_PASSWORD: mada_test_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mada_test -d madacash_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -26,6 +40,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Audit dependencies
+        run: pnpm audit --audit-level=high
+
       - name: Lint
         run: pnpm lint
 
@@ -35,5 +52,34 @@ jobs:
       - name: Test
         run: pnpm test
 
+      - name: PostgreSQL integration tests
+        run: pnpm --filter @mada-cash/api run test:postgres
+        env:
+          TEST_DATABASE_URL: postgresql://mada_test:mada_test_only@127.0.0.1:5432/madacash_test?schema=public
+
       - name: Build
         run: pnpm build
+        env:
+          API_INTERNAL_URL: http://127.0.0.1:3211
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install --yes postgresql-client
+
+      - name: Create isolated restore-test databases
+        run: |
+          createdb --host=127.0.0.1 --port=5432 --username=mada_test madacash_restore_source
+          createdb --host=127.0.0.1 --port=5432 --username=mada_test madacash_restore_target
+        env:
+          PGPASSWORD: mada_test_only
+
+      - name: Verify PostgreSQL backup and restore
+        run: pnpm --filter @mada-cash/api run test:restore
+        env:
+          RESTORE_SOURCE_URL: postgresql://mada_test:mada_test_only@127.0.0.1:5432/madacash_restore_source
+          RESTORE_TARGET_URL: postgresql://mada_test:mada_test_only@127.0.0.1:5432/madacash_restore_target
+
+      - name: Install Playwright browser
+        run: pnpm --filter @mada-cash/web exec playwright install --with-deps chromium
+
+      - name: Browser journeys and accessibility
+        run: pnpm --filter @mada-cash/web run test:e2e

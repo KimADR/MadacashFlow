@@ -21,7 +21,13 @@ import { InvoiceImportService } from './invoice-import.service';
 
 function invoiceCsvInterceptor() {
   return FileInterceptor('file', {
-    limits: { fileSize: MAX_CSV_BYTES, files: 1, fields: 5 },
+    limits: {
+      fileSize: MAX_CSV_BYTES,
+      files: 1,
+      fields: 5,
+      fieldSize: 1_024,
+      parts: 6,
+    },
     fileFilter: (_request, file, callback) => {
       if (extname(file.originalname).toLowerCase() !== '.csv') {
         callback(new BadRequestException('Seuls les fichiers .csv sont acceptés.'), false);

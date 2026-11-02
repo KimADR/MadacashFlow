@@ -1,8 +1,9 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication, UnauthorizedException, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { MembershipRole } from '@prisma/client';
 import request from 'supertest';
 import { AppModule } from '../app.module';
+import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 const userId = 'c0a80101-0000-4000-8000-000000000001';
@@ -26,6 +27,7 @@ describe('Authentication and tenant isolation', () => {
     },
     $transaction: jest.fn(),
   };
+  let loginMock: jest.SpyInstance;
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
@@ -33,6 +35,7 @@ describe('Authentication and tenant isolation', () => {
       .useValue(prismaMock)
       .compile();
 
+    loginMock = jest.spyOn(moduleRef.get(AuthService), 'login');
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix('api/v1');
     app.useGlobalPipes(
@@ -47,6 +50,9 @@ describe('Authentication and tenant isolation', () => {
 
   beforeEach(() => {
     jest.resetAllMocks();
+    loginMock.mockRejectedValue(
+      new UnauthorizedException({ code: 'INVALID_CREDENTIALS' }),
+    );
     prismaMock.session.findUnique.mockResolvedValue({
       id: sessionId,
       activeTenantId: tenantAId,
@@ -197,5 +203,25 @@ describe('Authentication and tenant isolation', () => {
       .set('X-CSRF-Token', 'different-token')
       .send({ tenantId: tenantAId })
       .expect(403);
+  });
+
+  it('rate-limits repeated login attempts', async () => {
+    const responses = [];
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      responses.push(
+        await request(app.getHttpServer())
+          .post('/api/v1/auth/login')
+          .set('Origin', 'http://localhost:3000')
+          .set('Cookie', `madacash_csrf=${csrfToken}`)
+          .set('X-CSRF-Token', csrfToken)
+          .send({ email: 'admin@example.test', password: 'wrong-password' }),
+      );
+    }
+
+    expect(responses.slice(0, 5).map((response) => response.status)).toEqual([
+      401, 401, 401, 401, 401,
+    ]);
+    expect(responses[5].status).toBe(429);
+    expect(loginMock).toHaveBeenCalledTimes(5);
   });
 });

@@ -88,13 +88,16 @@ export default async function ForecastPage({
     Number.isSafeInteger(requestedPage) && requestedPage > 0
       ? requestedPage
       : 1;
-  const [openingBalance, expenses] = await Promise.all([
-    getApiData<OpeningBalance | null>('/forecast/opening-balance'),
+  const [openingBalanceResult, expenses] = await Promise.all([
+    getApiData<{ openingBalance: OpeningBalance | null }>(
+      '/forecast/opening-balance',
+    ),
     getApiData<ExpensePage>(
       `/forecast/expenses?status=PLANNED&page=${expensesPage}&limit=100`,
     ),
   ]);
-  if (expenses === null) redirect('/login');
+  if (openingBalanceResult === null || expenses === null) redirect('/login');
+  const openingBalance = openingBalanceResult.openingBalance;
   if (
     expenses.pagination.pages > 0 &&
     expensesPage > expenses.pagination.pages

@@ -20,7 +20,7 @@ export default async function DashboardPage() {
     currentUser.role === 'ADMIN' ||
     currentUser.role === 'FINANCE' ||
     currentUser.role === 'VIEWER';
-  const [summary, openingBalance] = await Promise.all([
+  const [summary, openingBalanceResult] = await Promise.all([
     getApiData<{
       totalOpenAr: string;
       invoiceCount: number;
@@ -29,12 +29,16 @@ export default async function DashboardPage() {
       buckets: Record<string, { amountAr: string; count: number }>;
     }>('/invoices/summary'),
     canReadForecast
-      ? getApiData<{ asOfDate: string; amountAr: string } | null>(
+      ? getApiData<{
+          openingBalance: { asOfDate: string; amountAr: string } | null;
+        }>(
           '/forecast/opening-balance',
         )
       : Promise.resolve(null),
   ]);
   if (!summary) redirect('/login');
+  if (canReadForecast && !openingBalanceResult) redirect('/login');
+  const openingBalance = openingBalanceResult?.openingBalance ?? null;
   const forecast = openingBalance
     ? await getApiData<{
         forecast: {

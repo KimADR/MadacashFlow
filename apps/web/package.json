@@ -6,9 +6,10 @@
     "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start -p 3000",
-    "lint": "eslint app lib --ext .ts,.tsx --max-warnings=0",
+    "lint": "eslint app lib tests playwright.config.ts --ext .ts,.tsx --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "test": "node ./scripts/smoke.mjs",
+    "test:e2e": "playwright test",
     "format": "prettier --write ."
   },
   "dependencies": {
@@ -18,6 +19,8 @@
     "react-dom": "19.1.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "@playwright/test": "^1.64.1",
     "@types/node": "^24.7.0",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",

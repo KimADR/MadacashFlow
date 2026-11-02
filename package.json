@@ -25,6 +25,14 @@
     "typescript": "^5.9.2"
   },
   "pnpm": {
+    "overrides": {
+      "deepmerge-ts": "^8.0.0",
+      "effect": "^3.20.0",
+      "glob": "^14.0.2",
+      "minimatch": "^11.0.1",
+      "multer": "^2.5.0",
+      "zod": "^4.6.6"
+    },
     "onlyBuiltDependencies": [
       "@prisma/client",
       "@prisma/engines",

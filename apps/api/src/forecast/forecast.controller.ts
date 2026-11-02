@@ -41,8 +41,10 @@ export class ForecastController {
 
   @Get('opening-balance')
   @Roles(...READ_ROLES)
-  openingBalance(@CurrentAuth() auth: AuthenticatedUserContext) {
-    return this.forecastService.currentOpeningBalance(auth);
+  async openingBalance(@CurrentAuth() auth: AuthenticatedUserContext) {
+    return {
+      openingBalance: await this.forecastService.currentOpeningBalance(auth),
+    };
   }
 
   @Post('opening-balance')
