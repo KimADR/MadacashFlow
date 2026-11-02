@@ -39,16 +39,41 @@ if (source.host !== target.host || source.port !== target.port || source.user !=
 
 const table = `restore_probe_${randomUUID().replaceAll('-', '')}`;
 const backupPath = join(tmpdir(), `madacash-restore-${randomUUID()}.dump`);
+const useDockerPgTools = process.env.PG_TOOLS_IN_DOCKER === 'true';
+const runnerUid = process.getuid?.();
+const runnerGid = process.getgid?.();
+
+if (useDockerPgTools && (runnerUid === undefined || runnerGid === undefined)) {
+  throw new Error('Docker PostgreSQL tools require a Unix runner.');
+}
 
 function run(command, args, database) {
-  const result = spawnSync(command, args, {
+  const executable = useDockerPgTools ? 'docker' : command;
+  const commandArgs = useDockerPgTools
+    ? [
+        'run',
+        '--rm',
+        '--network',
+        'host',
+        '--user',
+        `${runnerUid}:${runnerGid}`,
+        '--volume',
+        `${tmpdir()}:${tmpdir()}`,
+        '--env',
+        'PGPASSWORD',
+        'postgres:16-alpine',
+        command,
+        ...args,
+      ]
+    : args;
+  const result = spawnSync(executable, commandArgs, {
     env: { ...process.env, PGPASSWORD: database.password },
     encoding: 'utf8',
     maxBuffer: 5 * 1024 * 1024,
   });
   if (result.error) throw result.error;
   if (result.status !== 0) {
-    throw new Error(`${command} failed: ${(result.stderr || result.stdout).trim()}`);
+    throw new Error(`${executable} ${command} failed: ${(result.stderr || result.stdout).trim()}`);
   }
   return result.stdout.trim();
 }

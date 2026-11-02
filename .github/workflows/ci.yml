@@ -65,19 +65,17 @@ jobs:
         env:
           API_INTERNAL_URL: http://127.0.0.1:3211
 
-      - name: Install PostgreSQL client
-        run: sudo apt-get update && sudo apt-get install --yes postgresql-client
-
       - name: Create isolated restore-test databases
         run: |
-          createdb --host=127.0.0.1 --port=5432 --username=mada_test madacash_restore_source
-          createdb --host=127.0.0.1 --port=5432 --username=mada_test madacash_restore_target
+          docker run --rm --network host --env PGPASSWORD postgres:16-alpine createdb --host=127.0.0.1 --port=5432 --username=mada_test madacash_restore_source
+          docker run --rm --network host --env PGPASSWORD postgres:16-alpine createdb --host=127.0.0.1 --port=5432 --username=mada_test madacash_restore_target
         env:
           PGPASSWORD: mada_test_only
 
       - name: Verify PostgreSQL backup and restore
         run: pnpm --filter @mada-cash/api run test:restore
         env:
+          PG_TOOLS_IN_DOCKER: 'true'
           RESTORE_SOURCE_URL: postgresql://mada_test:mada_test_only@127.0.0.1:5432/madacash_restore_source
           RESTORE_TARGET_URL: postgresql://mada_test:mada_test_only@127.0.0.1:5432/madacash_restore_target
 
